@@ -1,0 +1,533 @@
+JMP main
+JMP isr 
+;strings
+s: DB "  Drawing Game"
+DB 0
+s1: DB "Starting"
+DB 0
+s1_1: DB "Starting."
+DB 0
+s1_2: DB "Starting.."
+DB 0
+s1_3: DB "Starting..."
+DB 0
+s2: DB "Press Spacebar to Start the Game"
+DB 0
+s3: DB "You Can Now Play the game! START"
+DB 0
+s4: DB "You quitted the game. GOODBYE:) "
+DB 0
+s5: DB "BYEBYE! :D  8 8 8 8 8 8 8 8  "
+DB 0
+
+cat:
+DB "x00\x00\x18\x18\x24\x24\x24\x24\x3F\xFC\x3F\xFC\x7F\xFE\x73\xAE\x73\xAE\x7E\x7E\x77\xEE\x70\x0E\x3F\xFC\x1F\xF8\x00\x00\x00\x00"
+ 
+
+s6: DB "MANUAL"
+DB 0
+s7:	DB "Pressing: "
+DB 0
+s8:	DB "a - left "
+DB 0
+s9: DB "d - right "
+DB 0 
+s10: DB "w - up "
+DB 0
+s11: DB "s - down"
+DB 0
+s12: DB "r - lower red"
+DB 0
+s13: DB "g - lower green"
+DB 0
+s14: DB "b - lower blue"
+DB 0
+s15: DB "0 - delete block"
+DB 0
+s16: DB "1 - redo outline"
+DB 0
+s17: DB "p - reset"
+DB 0
+s18: DB "q - quit"
+DB 0
+    
+
+
+;variables
+x: DW 0x0000 ; bg initial color 
+y: DW 0x0000 ; inital position of the square 
+z: DW 0xFF ; initial color of the square 
+t: DW 0x00 ; black color to delete square 
+w: DW 0xFF ; white color to redo outlines 
+var: DW 10000 ; variable to use for wait time 
+var3: DW 5000
+
+vsync: DW 0 ; vertical sync for the interrupt 
+
+isr:
+PUSH A 
+MOV [vsync], 1
+MOV A, 4
+OUT 2
+POP A 
+IRET 
+
+;FUNCTIONS HERE 
+;passing the arguments like so 
+;in C we have the string position
+;in D we pass the position on the screen row+column
+;in B we have on the BL the color, and on the higher part 
+;we have the character we want to print 
+draw_text:
+    MOVB BH, [C]        ; Get a char
+    CMPB BH, 0          
+    JE draw_text_return
+    MOV A, D            ; Set the VRAM address for the char
+    OUT 8               
+    MOV A, B            ; char color
+    OUT 9               
+    INC C               ; next char
+    ADD D, 2            ; next address.
+    JMP draw_text
+draw_text_return:
+    RET
+
+
+draw_title_set_bg:
+
+;set bg color
+MOV A, 0xA300
+OUT 8 
+MOV A, 99 ;change color if i want to 
+OUT 9
+;draw Paint game 
+MOV C, s
+MOV B, 240 ; change color if i want to 
+MOV D, 0x0600
+CALL draw_text
+CALL draw_starting
+RET
+
+
+
+; prints the instructions on the display 
+game_instructions_loop:
+MOV D, display
+loopi:
+MOVB BL, [A]
+CMPB BL, 0
+JE return
+MOVB [D], BL 
+INC A
+INC D
+JMP loopi
+return:
+RET 
+
+
+game_instructions:
+MOV A, s2
+CALL game_instructions_loop
+RET
+
+
+reset_screen:
+readkey:
+IN 5
+CMP A, 0
+JE readkey
+MOV B, A 
+IN 6 
+AND B, 1
+CMP B, 1
+JE reset
+JMP readkey
+reset:
+MOV A, 3
+OUT 7 
+MOV A, 0xA300
+OUT 8
+MOV A, 0x0000
+OUT 9
+CALL game_instructions_2
+RET  
+
+game_instructions_2:
+MOV A, s3
+CALL game_instructions_loop
+RET
+
+
+;for the animation at the end of the screen 
+wait_next_frame:
+PUSH A 
+wait_next_frame_loop: 
+MOV A, [vsync]
+CMP A, 0
+JE wait_next_frame_loop
+MOV [vsync], 0
+POP A
+RET 
+
+
+; the byebye screen
+draw_end_screen:
+MOV A, 3      ; clean the screen 
+OUT 7
+MOV C, s5     ; string pointer 
+MOV B, 240    ; change color if i want to(orange for now, if bored of design make it better)
+MOV D, 0x0820 ; move to it the column and the row 
+CALL draw_text 
+MOV A, 0xA300 ; go to bg address 
+OUT 8
+MOV A, 99     ; add color to it 
+OUT 9
+MOV A, s4     ; make a "pointer"
+CALL game_instructions_loop ; call to print in the display 
+RET
+
+
+
+draw_starting:
+;draw 'starting'
+call_1: 
+MOV C, s1
+MOV B, 240 ; change color if i want to 
+MOV D, 0x0806
+CALL draw_text
+
+;timer
+MOV C, [var3]
+wait_2:
+CMP C, 0
+JE call_2
+DEC C 
+JMP wait_2
+
+;draw 'starting.'
+call_2: 
+MOV C, s1_1
+MOV B, 240 ; change color if i want to 
+MOV D, 0x0806
+CALL draw_text
+
+;timer
+MOV C, [var3]
+wait_3:
+CMP C, 0
+JE call_3
+DEC C 
+JMP wait_3
+
+;draw 'starting..'
+call_3: 
+MOV C, s1_2
+MOV B, 240 ; change color if i want to 
+MOV D, 0x0806
+CALL draw_text
+
+;timer
+MOV C, [var3]
+wait_4:
+CMP C, 0
+JE call_4
+DEC C 
+JMP wait_4
+
+;draw 'starting...'
+call_4:
+MOV C, s1_3
+MOV B, 240 ; change color if i want to 
+MOV D, 0x0806
+CALL draw_text
+RET
+
+
+;manual screen info drawn here 
+;for each string we call the draw_text function to 
+;be able to write it on the screen 
+draw_manual:
+MOV A, 3      ; clean the screen 
+OUT 7
+MOV C, s6
+MOV B, 240
+MOV D, 0x000A
+CALL draw_text
+MOV C, s7
+MOV B, 240
+MOV D, 0x0200
+CALL draw_text
+MOV C, s8
+MOV B, 240
+MOV D, 0x0300
+CALL draw_text
+MOV C, s9
+MOV B, 240
+MOV D, 0x0400
+CALL draw_text
+MOV C, s10
+MOV B, 240
+MOV D, 0x0500
+CALL draw_text
+MOV C, s11
+MOV B, 240
+MOV D, 0x0600
+CALL draw_text
+MOV C, s12
+MOV B, 240
+MOV D, 0x0700
+CALL draw_text
+MOV C, s13
+MOV B, 240
+MOV D, 0x0800
+CALL draw_text
+MOV C, s14
+MOV B, 240
+MOV D, 0x0900
+CALL draw_text
+MOV C, s15
+MOV B, 240
+MOV D, 0x0A00
+CALL draw_text
+MOV C, s16
+MOV B, 240
+MOV D, 0x0B00
+CALL draw_text
+MOV C, s17
+MOV B, 240
+MOV D, 0x0C00
+CALL draw_text
+MOV C, s18
+MOV B, 240
+MOV D, 0x0D00
+CALL draw_text
+RET  
+
+
+;when 'p' is presses 
+game_restart:
+MOV A, 3      ; clean the screen 
+OUT 7
+MOV [x], 0x0000 ; reset color of bg 
+MOV [y], 0x0000 ; reset position of square 
+MOV [z], 0xFF   ; reset initial color of the square 
+RET 
+
+;MAIN HERE
+main:
+MOV SP, 0x0FFF
+MOV A, 1         ; SET UP THE TEXT MODE 
+OUT 7
+
+; START Game INTRO 
+CALL draw_title_set_bg
+CALL game_instructions
+;timer 
+MOV C, [var]
+wait:
+CMP C, 0
+JE call_function
+DEC C 
+JMP wait
+call_function:
+CALL draw_manual
+CALL reset_screen
+; END game INTRO 
+
+
+;GAME START HERE 
+game:
+MOV A, [x]      ; initially black screen 
+OUT 9
+MOV A, [y]      ; initialize the place for the first icon 
+OUT 8
+
+;initialize first square in white here 
+MOVB AH, 219
+MOV B, [z]
+MOVB AL, BL
+OUT 9
+
+read:
+IN 5            ; check for input from keyboard 
+CMP A, 0        ; if there is none 
+JE read         ; read again
+MOV B, A        ; else if not create a copy of the status 
+IN 6            ; in A put the data 
+AND B, 1        ; here mask the keydown bit 
+CMP B, 1        ; compare if it is one 
+JE go           ; if yes go to go label 
+JMP read
+
+go:
+CMPB AL, 0x64   ;check if its 'd'
+JE right 
+CMPB AL, 0x61   ; check if 'a'
+JE left
+CMPB AL, 0x77   ; check if 'w'
+JE up
+CMPB AL, 0x73   ; check if 's'
+JE down
+CMPB AL, 0x62   ; check if 'b'
+JE blue        
+CMPB AL, 0x67   ; compare if 'g' 
+JE green
+CMPB AL, 0x72   ; compare if 'r'
+JE red
+CMPB AL, 0x30   ; compare if '0'
+JE zero    
+CMPB AL, 0x31   ; compare if '1'
+JE one
+CMPB AL, 0x71   ; if data is 71('q') we quit the game 
+JE end
+CMPB AL, 0x70   ; compare if 'p'
+JE gamerestart  ; if p pressed reset the screen basically restart drawing 
+JNE read 
+gamerestart:
+CALL game_restart
+JMP game 
+
+
+right:
+end_right:
+MOV A, [y]
+ADD A, 2
+MOV [y], A ; create a copy of the position 
+OUT 8
+MOVB AH, 219
+MOV B, [z]
+MOVB AL, BL
+OUT 9
+JMP read
+
+left:
+end_left:
+MOV A, [y]
+SUB A, 2
+MOV [y], A ; create a copy of the position 
+OUT 8
+MOVB AH, 219
+MOV B, [z]
+MOVB AL, BL
+OUT 9
+JMP read
+
+down:
+end_down:
+MOV A, [y]
+ADD A, 256
+MOV [y], A ; create a copy of the position 
+OUT 8
+MOVB AH, 219
+MOV B, [z]
+MOVB AL, BL
+OUT 9
+JMP read
+
+up:
+end_up:
+MOV A, [y]
+SUB A, 256
+MOV [y], A ; create a copy of the position 
+OUT 8
+MOVB AH, 219
+MOV B, [z]
+MOVB AL, BL
+OUT 9
+JMP read
+
+
+blue:
+MOV A, [y]
+OUT 8
+MOV D, [z]
+MOV B, D
+AND B, 0xFFFC
+AND D, 0x0003
+ADD D, 2
+ADD B, D 
+MOV [z], B
+MOVB AH, 219
+MOVB AL, BL
+OUT 9
+JMP read
+red:
+MOV A, [y]
+OUT 8
+MOV D, [z]
+MOV B, D
+AND B, 0xFF1F
+AND D, 0x00E0
+ADD D, 2
+ADD B, D 
+MOV [z], B
+MOVB AH, 219
+MOVB AL, BL
+OUT 9
+JMP read
+green:
+MOV A, [y]
+OUT 8
+MOV D, [z]
+MOV B, D
+AND B, 0xFFE3
+AND D, 0x001C
+ADD D, 2 
+ADD B, D 
+MOV [z], B
+MOVB AH, 219
+MOVB AL, BL
+OUT 9
+JMP read
+zero:
+MOV B, [t]
+MOV [z], B 
+JMP read
+one:
+MOV B, [w]
+MOV [z], B
+JMP read 
+enddd:
+
+
+end:
+CALL draw_end_screen
+
+
+; change 8 into cat shape 
+MOV C, cat
+MOV D, 0x8700 
+MOV B, 16
+cat_loop:
+CMP B, 0
+JE cat_loop_break
+MOV A, D
+OUT 8
+MOV A, [C]
+OUT 9
+DEC B
+ADD C, 2
+ADD D, 2
+JMP cat_loop
+cat_loop_break:
+
+MOV A, 4 
+OUT 0
+STI ;enable interrupts 
+
+MOV A, 0xA302 
+OUT 8 
+MOV A, 0
+offset_loop:
+OUT 9 
+INC A
+CMP A, 684
+JB offset_continue
+MOV A, 0
+offset_continue:
+CALL wait_next_frame
+JMP offset_loop
+HLT 
+
+ORG 0x1000
+display:
